@@ -20,6 +20,10 @@ library
                      , aeson
                      , scotty
                      , wai
+                     , text
+                     , hedis
+                     , bytestring
+                     , random
   default-language:    Haskell2010
 
 executable shorturls-exe
