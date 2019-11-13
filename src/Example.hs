@@ -10,6 +10,7 @@ import Control.Monad (replicateM)
 import System.Random (randomRIO)
 import System.Environment (lookupEnv)
 import Data.Maybe (fromMaybe)
+import Network.HTTP.Types.Status (status500, status404, statusMessage)
 
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text.Encoding as T
@@ -47,9 +48,15 @@ app' connpool defaultUrl = do
     randomID <- S.param "random_id"
     emurl <- liftIO $ Hedis.runRedis connpool (Hedis.get randomID)
     case emurl of
-      Left _ -> S.text "500 - Whatever"
-      Right Nothing -> S.text "404 - Not Found"
+      Left err -> S.status $ status500 { statusMessage = toErrMsg err }
+      Right Nothing -> S.status status404
       Right (Just url) -> S.redirect . T.fromStrict . T.decodeUtf8 $ url
+  where
+    toErrMsg (Hedis.SingleLine bs) = bs
+    toErrMsg (Hedis.Error bs) = bs
+    toErrMsg (Hedis.Bulk (Just bs)) = bs
+    toErrMsg (Hedis.MultiBulk (Just replies)) = mconcat $ fmap toErrMsg replies
+    toErrMsg _ = "Internal Server Error"
 
 runAppWith :: (S.ScottyM () -> IO b) -> IO b
 runAppWith f = do
